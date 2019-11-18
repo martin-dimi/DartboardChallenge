@@ -32,14 +32,18 @@ using namespace std;
 using namespace cv;
 
 /** Function Headers */
-tuple<float, float> detectAndDisplay(Mat frame, float locations[16][15][4], int imageIndex, vector<Rect> faces);
+vector<Rect> detectAndDisplay(Mat frame, float locations[16][15][4], int imageIndex);
 
 void loadGroundTruth(float locations[16][15][4]);
 
-tuple<float, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces);
+map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces);
+
+int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
+
+tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
 
 /** Global variables */
-String cascade_name = "frontalface.xml";
+String cascade_name = "dartcascade/cascade.xml";
 CascadeClassifier cascade;
 
 
@@ -59,13 +63,24 @@ int main( int argc, const char** argv )
 		if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
 		// 3. Detect Faces and Display Result
-		vector<Rect> faces;
-		tuple<float, float> s = detectAndDisplay( frame, locations, imageIndex, faces );
+		vector<Rect> faces = detectAndDisplay( frame, locations, imageIndex);
+		// cout<< faces.size();
 
-		float TPR = get<0>(s) * 100.0f;
-		float F1 =  get<1>(s) * 100.0f;
+		// cout << "Calculating IOU for " << imageIndex << "\n";
+		map<int, float> IOU = calculateIOU(locations[imageIndex], faces);
 
-		cout << "TPR: " << TPR << "%, F1: " << F1 << "%\n";
+		int correctFacesCount = getCorrectFaceCount(IOU, 40.0f);
+
+		int groundTruthFaces = IOU.size();
+
+		int predictedFaces = faces.size();
+
+		tuple<float, float> derivations = TPRandF1(correctFacesCount, groundTruthFaces, predictedFaces);
+
+		float TPR = get<0>(derivations) * 100.0f;
+		float F1 =  get<1>(derivations) * 100.0f;
+
+		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
 		// 4. Save Result Image
 		imwrite( "compared_" + name, frame );
@@ -75,7 +90,6 @@ int main( int argc, const char** argv )
 }
 
 void loadGroundTruth(float locations[16][15][4]) {
-
 
 	for(int nameNum = 0; nameNum <= 15; nameNum++) {
 
@@ -105,9 +119,10 @@ void loadGroundTruth(float locations[16][15][4]) {
 }
 
 /** @function detectAndDisplay */
-tuple<float, float> detectAndDisplay( Mat frame, float locations[16][15][4], int imageIndex, vector<Rect> faces )
+vector<Rect> detectAndDisplay( Mat frame, float locations[16][15][4], int imageIndex)
 {
 	Mat frame_gray;
+	vector<Rect> faces;
 
 	// 1. Prepare Image by turning it into Grayscale and normalising lighting
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
@@ -122,39 +137,40 @@ tuple<float, float> detectAndDisplay( Mat frame, float locations[16][15][4], int
 	// 4. Draw box around faces found
 	for( int i = 0; i < faces.size(); i++ )
 	{
+		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
+	}
+
+	for(int i = 0; i < 15; i++){
 		float truthX = locations[imageIndex][i][0] * frame_gray.cols;
 		float truthY = locations[imageIndex][i][1] * frame_gray.rows;
 		float truthW = locations[imageIndex][i][2] * frame_gray.cols;
 		float truthH = locations[imageIndex][i][3] * frame_gray.rows;
 
 		locations[imageIndex][i][0] = truthX;
+		if(truthX == 0) break;
 		locations[imageIndex][i][1] = truthY;
 		locations[imageIndex][i][2] = truthW;
 		locations[imageIndex][i][3] = truthH;
 
 		float x = truthX - truthW / 2.0f;
 		float y = truthY - truthH / 2.0f;
-
-		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
+		
 		rectangle(frame, Point(x, y), Point(x + truthW, y + truthH), Scalar( 0, 0, 255 ), 2);
 	}
 
-	cout << "Calculating IOU for " << imageIndex << "\n";
-	return calculateIOU(locations[imageIndex], faces);
+	return faces;
+
 }
 
-tuple<float, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces) {
+map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces) {
 
-	int correctFaceCount = 0;
-	float IOUThreshold = 0.4f;
-	int totalFaces = 0;
+	map<int, float> facesToIou;
 
 	for(int faceNum=0; faceNum < 15; faceNum++) {
 		float *trueFace = trueFaces[faceNum];
 		if(trueFace[0] == 0) break;
 
 		float maxIOU = -1;
-		totalFaces++;
 
 	 	for(int decNum = 0; decNum < faces.size(); decNum++) {
 
@@ -176,19 +192,35 @@ tuple<float, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces) {
 
 			if(IOU > maxIOU) maxIOU = IOU;
 
-			// printf("Overlap: %d, Union: %d, IOU: %f\n", overlapArea, unionArea, IOU);
 		}
 
-		if(maxIOU >= IOUThreshold) correctFaceCount++;
+		facesToIou[faceNum] = maxIOU;
+
 	}
 
+	return facesToIou;
+}
+
+int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold){
+	int counter = 0;
+	for(map<int, float>::iterator it = IOU.begin(); it != IOU.end(); it++){
+		if(it->second * 100 > IOUThreshold)  
+			counter++;
+	}
+
+	return counter;
+}
+
+tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces){
 	float TP = correctFaceCount;
 	float TN = 0;
-	float FP = faces.size() - correctFaceCount;
-	float FN = totalFaces - correctFaceCount;
+	float FP = predictedFaces - correctFaceCount;
+	float FN = groundTruthFaces - correctFaceCount;
 
 	float TPR = TP + FN == 0 ? 1 : TP / (TP + FN);
 	float F1 = (2.0f * TP + FP + FN) == 0 ? 1  : 2.0f * TP / (2.0f * TP + FP + FN);
 
 	return {TPR, F1};
 }
+
+	
