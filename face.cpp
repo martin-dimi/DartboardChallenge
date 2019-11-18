@@ -43,7 +43,7 @@ int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
 
 /** Global variables */
-String cascade_name = "dartcascade/cascade.xml";
+String cascade_name = "dartcascade/stage2.xml";
 CascadeClassifier cascade;
 
 
