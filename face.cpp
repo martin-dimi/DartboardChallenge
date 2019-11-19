@@ -34,7 +34,7 @@ using namespace cv;
 /** Function Headers */
 vector<Rect> detectAndDisplay(Mat frame, float locations[16][15][4], int imageIndex);
 
-void loadGroundTruth(float locations[16][15][4]);
+void loadGroundTruth(float locations[16][15][4], String path);
 
 map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces);
 
@@ -43,26 +43,37 @@ int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
 
 /** Global variables */
-String cascade_name = "dartcascade/stage2.xml";
-CascadeClassifier cascade;
+String input_image_path = "images/";
+String output_image_path = "output/";
+String face_path = "GroundTruth_Face/";
+String dart_path = "GroundTruth_Dart/";
 
+String dartboard_classifier = "dartcascade/cascade.xml";
+String face_classifier = "frontalface.xml";
+
+CascadeClassifier cascade;
 
 /** @function main */
 int main( int argc, const char** argv )
 {
+	bool isDartboard = true;
 
 	float locations[16][15][4] = {};
-	loadGroundTruth(locations);
+	String groundTruthPath = isDartboard ? dart_path : face_path;
+	loadGroundTruth(locations, groundTruthPath);
+
+
+	// Load the Strong Classifier in a structure called `Cascade'
+	String cascadeName = isDartboard ? dartboard_classifier : face_classifier;
+	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
 	for(int imageIndex = 0; imageIndex <= 15; imageIndex++) {
-		// 1. Read Input Image
+		// Read Input Image
 		String name = "dart" + to_string(imageIndex) + ".jpg";
-		Mat frame = imread(name, IMREAD_COLOR);
+		String image_path = input_image_path + name;
+		Mat frame = imread(image_path, IMREAD_COLOR);
 
-		// 2. Load the Strong Classifier in a structure called `Cascade'
-		if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
-
-		// 3. Detect Faces and Display Result
+		// Detect Faces and Display Result
 		vector<Rect> faces = detectAndDisplay( frame, locations, imageIndex);
 		// cout<< faces.size();
 
@@ -70,30 +81,28 @@ int main( int argc, const char** argv )
 		map<int, float> IOU = calculateIOU(locations[imageIndex], faces);
 
 		int correctFacesCount = getCorrectFaceCount(IOU, 40.0f);
-
 		int groundTruthFaces = IOU.size();
-
 		int predictedFaces = faces.size();
 
 		tuple<float, float> derivations = TPRandF1(correctFacesCount, groundTruthFaces, predictedFaces);
-
 		float TPR = get<0>(derivations) * 100.0f;
 		float F1 =  get<1>(derivations) * 100.0f;
 
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
 		// 4. Save Result Image
-		imwrite( "compared_" + name, frame );
+		String outputName = isDartboard ? "dart_" : "face_";
+		imwrite(output_image_path + outputName + name, frame );
 	}
 
 	return 0;
 }
 
-void loadGroundTruth(float locations[16][15][4]) {
+void loadGroundTruth(float locations[16][15][4], String path) {
 
 	for(int nameNum = 0; nameNum <= 15; nameNum++) {
 
-		String name = "GroundTruth/dart" + to_string(nameNum) + ".txt";
+		String name = path + "dart" + to_string(nameNum) + ".txt";
 		ifstream file(name);
 
 		if(file.is_open()) {
