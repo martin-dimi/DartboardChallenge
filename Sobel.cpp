@@ -1,6 +1,7 @@
 #include "Sobel.hpp"
 
 using namespace cv;
+using namespace std;
 
 int dx[3][3] = {
         {-1, 0, 1},
@@ -114,8 +115,11 @@ int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int thresh
     for(int x = 1; x < magnitude.rows - 1; x++) {	
         for(int y = 1; y < magnitude.cols - 1; y++) {
 
-            if(magnitude.at<float>(x,y) <= threshold)
+            if(magnitude.at<float>(x,y) <= threshold) {
+                // TODO move this function out of here. Instead we just check if the mag == 0;
+                magnitude.at<float>(x,y) = 0;
                 continue;
+            }
 
             float dir = direction.at<float>(x,y);
 
@@ -152,11 +156,11 @@ int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int thresh
         }
     }
 
+    imwrite("gradientMagThreshold.jpg", magnitude);
     return hough;
 }
 
-
-void visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
+Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
     Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
 
     for(int x = 1; x < rows-1; x++) {	
@@ -174,4 +178,65 @@ void visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
 
     houghImage = imageWrite(houghImage, "houghSpace.jpg");
     imwrite("houghSpace.jpg", houghImage);
+
+    return houghImage;
+}
+
+vector<tuple<int, int>> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY) {
+
+    int rows = houghImage.rows;
+    int cols = houghImage.cols;
+
+    vector<tuple<int, int>> locations;
+    bool found;
+
+    do {
+        float max = -1;
+        int locX;
+        int locY;
+        found = false;
+
+        for(int x = 1; x < rows-1; x++) {	
+            for(int y = 1; y < cols-1; y++) {
+                float value = houghImage.at<float>(x,y);
+
+                if(value > max) {
+                    max = value;
+                    locX = x;
+                    locY = y;
+                }
+
+            }
+        }
+
+        if(max >= threshold) {
+            // Save the location coordinates
+            tuple<int, int> loc = {locX, locY};
+            locations.insert(locations.end(), loc);
+            found = true;
+
+            // Clear the radius
+            for(int x = locX - deletionLengthX/2; x < locX + deletionLengthX/2; x++) {
+                // check if x is within bounds
+                if(x < 1) {
+                    x = 1;
+                    continue;
+                } else if (x > rows-1) break;
+                
+                for(int y = locY - deletionLengthY/2; y < locY + deletionLengthY/2; y++) {
+                    // check if y is within bounds
+                    if(y < 1) {
+                        y = 1;
+                        continue;
+                    } else if (y > cols-1) break;
+
+                    houghImage.at<float>(x,y) = 0;
+                }
+            }
+        }
+     } while (found);
+
+    imwrite("houghSpaceModiefied.jpg", houghImage);
+
+    return locations;
 }

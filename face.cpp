@@ -76,7 +76,7 @@ int main( int argc, const char** argv )
 	String cascadeName = isDartboard ? dartboard_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 0;
+	int ind = 13;
 	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
@@ -134,7 +134,8 @@ void calculateHoughSpace(Mat frame_gray) {
 	int rows = frame_gray.rows;
     int cols = frame_gray.cols;
 	int rmax = 200;
-	int magThreshold = 120; 
+	int magThreshold = 200; 
+	int houghThreshold = 200;
 
 	imageWrite(dxImage, "dx.jpg");
 	imageWrite(dyImage, "dy.jpg");
@@ -142,7 +143,11 @@ void calculateHoughSpace(Mat frame_gray) {
 	imageWrite(gradientDir, "gradientDir.jpg");
 
 	int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
-	visualiseHough(hough, rows, cols, rmax);
+	Mat houghImage = visualiseHough(hough, rows, cols, rmax);
+
+	vector<tuple<int, int>> points = getCenterPoints(houghImage, houghThreshold, rmax, rmax);
+
+	cout << "Number of points: " << points.size();
 }
 
 void loadGroundTruth(float locations[16][15][4], String path) {
