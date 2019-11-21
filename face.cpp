@@ -28,11 +28,13 @@
 #include <iostream>
 #include <stdio.h>
 
+#include <Sobel.hpp>
+
 using namespace std;
 using namespace cv;
 
 /** Function Headers */
-vector<Rect> detectAndDisplay(Mat frame, float locations[16][15][4], int imageIndex);
+vector<Rect> detectAndDisplay(Mat frame, Mat frame_gray, float locations[16][15][4], int imageIndex);
 
 void loadGroundTruth(float locations[16][15][4], String path);
 
@@ -41,6 +43,10 @@ map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces);
 int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
+
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, float groundTruth[15][4], vector<Rect> faces);
+
+void calculateHoughSpace(Mat frame_gray);
 
 /** Global variables */
 String input_image_path = "images/";
@@ -58,44 +64,85 @@ int main( int argc, const char** argv )
 {
 	bool isDartboard = true;
 
-	float locations[16][15][4] = {};
+	float groundTruth[16][15][4] = {};
 	String groundTruthPath = isDartboard ? dart_path : face_path;
-	loadGroundTruth(locations, groundTruthPath);
+	loadGroundTruth(groundTruth, groundTruthPath);
 
+	// The average TPR and F1 of all images
+	float overallTPR = 0;
+	float overallF1  = 0;
 
 	// Load the Strong Classifier in a structure called `Cascade'
 	String cascadeName = isDartboard ? dartboard_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	for(int imageIndex = 0; imageIndex <= 15; imageIndex++) {
-		// Read Input Image
+	int ind = 0;
+	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
+		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
 		String image_path = input_image_path + name;
 		Mat frame = imread(image_path, IMREAD_COLOR);
+		Mat frame_gray;
+		cvtColor( frame, frame_gray, CV_BGR2GRAY );
+		equalizeHist( frame_gray, frame_gray );
 
 		// Detect Faces and Display Result
-		vector<Rect> faces = detectAndDisplay( frame, locations, imageIndex);
-		// cout<< faces.size();
+		vector<Rect> faces = detectAndDisplay( frame, frame_gray, groundTruth, imageIndex);
 
-		// cout << "Calculating IOU for " << imageIndex << "\n";
-		map<int, float> IOU = calculateIOU(locations[imageIndex], faces);
-
-		int correctFacesCount = getCorrectFaceCount(IOU, 40.0f);
-		int groundTruthFaces = IOU.size();
-		int predictedFaces = faces.size();
-
-		tuple<float, float> derivations = TPRandF1(correctFacesCount, groundTruthFaces, predictedFaces);
-		float TPR = get<0>(derivations) * 100.0f;
-		float F1 =  get<1>(derivations) * 100.0f;
-
+		// Calculate perfomance
+		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth[imageIndex], faces);
+		float TPR = get<0>(performance);
+		float F1  = get<1>(performance);
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
+
+		calculateHoughSpace(frame_gray);
 
 		// 4. Save Result Image
 		String outputName = isDartboard ? "dart_" : "face_";
 		imwrite(output_image_path + outputName + name, frame );
 	}
+	// overallTPR /= 16;
+	// overallF1  /= 16;
+
+	// printf("Overall TRP: %f%, overall F1: %f%", overallTPR, overallF1);
 
 	return 0;
+}
+
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, float groundTruth[15][4], vector<Rect> faces) {
+	// cout << "Calculating IOU for " << imageIndex << "\n";
+	map<int, float> IOU = calculateIOU(groundTruth, faces);
+
+	int correctFacesCount = getCorrectFaceCount(IOU, 40.0f);
+	int groundTruthFaces = IOU.size();
+	int predictedFaces = faces.size();
+
+	tuple<float, float> derivations = TPRandF1(correctFacesCount, groundTruthFaces, predictedFaces);
+	float TPR = get<0>(derivations) * 100.0f;
+	float F1 =  get<1>(derivations) * 100.0f;
+
+	return {TPR, F1};
+}
+
+void calculateHoughSpace(Mat frame_gray) {
+	// Calculating Dx and Dy
+	Mat dxImage = calculateDx(frame_gray);
+	Mat dyImage = calculateDy(frame_gray); 
+	Mat gradientMag = calculateGradientMagnitude(dxImage, dyImage);
+	Mat gradientDir = calculateGradientDirection(dxImage, dyImage);
+
+	int rows = frame_gray.rows;
+    int cols = frame_gray.cols;
+	int rmax = 200;
+	int magThreshold = 120; 
+
+	imageWrite(dxImage, "dx.jpg");
+	imageWrite(dyImage, "dy.jpg");
+	imageWrite(gradientMag, "gradientMag.jpg");
+	imageWrite(gradientDir, "gradientDir.jpg");
+
+	int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
+	visualiseHough(hough, rows, cols, rmax);
 }
 
 void loadGroundTruth(float locations[16][15][4], String path) {
@@ -128,14 +175,9 @@ void loadGroundTruth(float locations[16][15][4], String path) {
 }
 
 /** @function detectAndDisplay */
-vector<Rect> detectAndDisplay( Mat frame, float locations[16][15][4], int imageIndex)
+vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, float locations[16][15][4], int imageIndex)
 {
-	Mat frame_gray;
 	vector<Rect> faces;
-
-	// 1. Prepare Image by turning it into Grayscale and normalising lighting
-	cvtColor( frame, frame_gray, CV_BGR2GRAY );
-	equalizeHist( frame_gray, frame_gray );
 
 	// 2. Perform Viola-Jones Object Detection 
 	cascade.detectMultiScale( frame_gray, faces, 1.1, 1, 0|CASCADE_SCALE_IMAGE, Size(50, 50), Size(500,500) );

@@ -101,3 +101,48 @@ Precalculation time: 6
 +----+---------+---------+
 END>
 Training until now has taken 0 days 0 hours 0 minutes 59 seconds.
+
+###################################
+Face
+###################################
+Image: 0, TPR: 0%, F1: 0%
+Image: 1, TPR: 100%, F1: 100%
+Image: 2, TPR: 100%, F1: 100%
+Image: 3, TPR: 100%, F1: 100%
+Image: 4, TPR: 100%, F1: 100%
+Image: 5, TPR: 100%, F1: 84.6154%
+Image: 6, TPR: 0%, F1: 0%
+Image: 7, TPR: 100%, F1: 100%
+Image: 8, TPR: 0%, F1: 0%
+Image: 9, TPR: 100%, F1: 40%
+Image: 10, TPR: 100%, F1: 0%
+Image: 11, TPR: 100%, F1: 100%
+Image: 12, TPR: 100%, F1: 100%
+Image: 13, TPR: 100%, F1: 66.6667%
+Image: 14, TPR: 100%, F1: 44.4444%
+Image: 15, TPR: 33.3333%, F1: 28.5714%
+
+Overall TRP: 77.083336%, overall F1: 60.268620%
+
+
+###################################
+dart
+###################################
+Image: 0, TPR: 100%, F1: 40%
+Image: 1, TPR: 100%, F1: 40%
+Image: 2, TPR: 100%, F1: 22.2222%
+Image: 3, TPR: 100%, F1: 50%
+Image: 4, TPR: 100%, F1: 40%
+Image: 5, TPR: 100%, F1: 28.5714%
+Image: 6, TPR: 100%, F1: 50%
+Image: 7, TPR: 0%, F1: 0%
+Image: 8, TPR: 100%, F1: 33.3333%
+Image: 9, TPR: 100%, F1: 33.3333%
+Image: 10, TPR: 66.6667%, F1: 36.3636%
+Image: 11, TPR: 100%, F1: 50%
+Image: 12, TPR: 100%, F1: 28.5714%
+Image: 13, TPR: 100%, F1: 40%
+Image: 14, TPR: 50%, F1: 9.52381%
+Image: 15, TPR: 100%, F1: 66.6667%
+
+Overall TRP: 88.541672%, overall F1: 35.536617%

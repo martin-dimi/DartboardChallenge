@@ -1,3 +1,4 @@
 /negatives
-/output/*
+/output/*.jpg
 a.out
+*.jpg
