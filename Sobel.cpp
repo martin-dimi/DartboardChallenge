@@ -182,12 +182,12 @@ Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
     return houghImage;
 }
 
-vector<tuple<int, int>> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY) {
+vector<DartboardLocation> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY) {
 
     int rows = houghImage.rows;
     int cols = houghImage.cols;
 
-    vector<tuple<int, int>> locations;
+    vector<DartboardLocation> locations;
     bool found;
 
     do {
@@ -211,7 +211,7 @@ vector<tuple<int, int>> getCenterPoints(Mat houghImage, int threshold, int delet
 
         if(max >= threshold) {
             // Save the location coordinates
-            tuple<int, int> loc = {locX, locY};
+            DartboardLocation loc = DartboardLocation(locY, locX);
             locations.insert(locations.end(), loc);
             found = true;
 

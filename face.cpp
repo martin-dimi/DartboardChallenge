@@ -34,19 +34,20 @@ using namespace std;
 using namespace cv;
 
 /** Function Headers */
-vector<Rect> detectAndDisplay(Mat frame, Mat frame_gray, float locations[16][15][4], int imageIndex);
+vector<DartboardLocation> loadGroundTruth(String path, Mat frame, int ind);
+vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex);
 
-void loadGroundTruth(float locations[16][15][4], String path);
-
-map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces);
+map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<Rect> faces);
 
 int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<Rect> faces);
 
-tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, float groundTruth[15][4], vector<Rect> faces);
-
-void calculateHoughSpace(Mat frame_gray);
+vector<DartboardLocation> calculateHoughSpace(Mat frame_gray);
+vector<DartboardLocation> getFacesPoints(vector<Rect> faces);
+vector<DartboardLocation> calculateEstimatedPoints(vector<DartboardLocation> facePoints, vector<DartboardLocation> houghPoints);
+void displayDetections(vector<DartboardLocation> locations, Mat frame);
 
 /** Global variables */
 String input_image_path = "images/";
@@ -54,7 +55,7 @@ String output_image_path = "output/";
 String face_path = "GroundTruth_Face/";
 String dart_path = "GroundTruth_Dart/";
 
-String dartboard_classifier = "dartcascade/cascade.xml";
+String DartboardLocation_classifier = "dartcascade/cascade.xml";
 String face_classifier = "frontalface.xml";
 
 CascadeClassifier cascade;
@@ -62,22 +63,20 @@ CascadeClassifier cascade;
 /** @function main */
 int main( int argc, const char** argv )
 {
-	bool isDartboard = true;
+	bool isDartboardLocation = true;
 
-	float groundTruth[16][15][4] = {};
-	String groundTruthPath = isDartboard ? dart_path : face_path;
-	loadGroundTruth(groundTruth, groundTruthPath);
+	String groundTruthPath = isDartboardLocation ? dart_path : face_path;
 
 	// The average TPR and F1 of all images
 	float overallTPR = 0;
 	float overallF1  = 0;
 
 	// Load the Strong Classifier in a structure called `Cascade'
-	String cascadeName = isDartboard ? dartboard_classifier : face_classifier;
+	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 13;
-	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
+	int ind = 6;
+	for(int imageIndex = ind; imageIndex < ind+1; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
 		String image_path = input_image_path + name;
@@ -87,18 +86,23 @@ int main( int argc, const char** argv )
 		equalizeHist( frame_gray, frame_gray );
 
 		// Detect Faces and Display Result
-		vector<Rect> faces = detectAndDisplay( frame, frame_gray, groundTruth, imageIndex);
+		vector<DartboardLocation> groundTruth = loadGroundTruth(groundTruthPath, frame, imageIndex);
+		vector<Rect> faces = detectAndDisplay(frame, frame_gray, groundTruth, imageIndex);
+		vector<DartboardLocation> facePoints = getFacesPoints(faces);
 
 		// Calculate perfomance
-		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth[imageIndex], faces);
+		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth, faces);
 		float TPR = get<0>(performance);
 		float F1  = get<1>(performance);
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
-		calculateHoughSpace(frame_gray);
+		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray);
+		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
+
+		displayDetections(estimatedPoints, frame);
 
 		// 4. Save Result Image
-		String outputName = isDartboard ? "dart_" : "face_";
+		String outputName = isDartboardLocation ? "dart_" : "face_";
 		imwrite(output_image_path + outputName + name, frame );
 	}
 	// overallTPR /= 16;
@@ -109,7 +113,44 @@ int main( int argc, const char** argv )
 	return 0;
 }
 
-tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, float groundTruth[15][4], vector<Rect> faces) {
+void displayDetections(vector<DartboardLocation> locations, Mat frame) {
+	for(int i = 0; i < locations.size(); i++){	
+		DartboardLocation loc = locations[i];
+		int x = loc.x - loc.width/2;
+		int y = loc.y - loc.height/2;
+
+		cv::rectangle(frame, Point(x, y), Point(x + loc.width, y + loc.height), Scalar( 255, 255, 0 ), 2);
+	}
+}
+
+vector<DartboardLocation> calculateEstimatedPoints(vector<DartboardLocation> facePoints, vector<DartboardLocation> houghPoints) {
+	vector<DartboardLocation> points;
+
+	for(std::size_t houghIt=0; houghIt<houghPoints.size(); ++houghIt) {
+		DartboardLocation houghPoint = houghPoints[houghIt];
+		double minDistance = DBL_MAX;
+		DartboardLocation bestEstimate;
+
+		for(std::size_t faceIt=0; faceIt<facePoints.size(); ++faceIt) {
+			DartboardLocation facePoint = facePoints[faceIt];
+
+			// Calculate euclidian difference
+			float dist = DartboardLocation::calculateDistance(houghPoint, facePoint);
+			if(dist < minDistance) {
+				minDistance = dist;
+				bestEstimate = DartboardLocation::getAverageLocation(houghPoint, facePoint);
+				bestEstimate.width = facePoint.width;
+				bestEstimate.height = facePoint.height;
+			}
+		}
+
+		cout << "Min dist: " << minDistance << "\n";
+		points.insert(points.end(), bestEstimate);
+	}
+	return points;
+}
+
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<Rect> faces) {
 	// cout << "Calculating IOU for " << imageIndex << "\n";
 	map<int, float> IOU = calculateIOU(groundTruth, faces);
 
@@ -124,7 +165,7 @@ tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, float ground
 	return {TPR, F1};
 }
 
-void calculateHoughSpace(Mat frame_gray) {
+vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
 	// Calculating Dx and Dy
 	Mat dxImage = calculateDx(frame_gray);
 	Mat dyImage = calculateDy(frame_gray); 
@@ -145,42 +186,63 @@ void calculateHoughSpace(Mat frame_gray) {
 	int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
 	Mat houghImage = visualiseHough(hough, rows, cols, rmax);
 
-	vector<tuple<int, int>> points = getCenterPoints(houghImage, houghThreshold, rmax, rmax);
+	vector<DartboardLocation> points = getCenterPoints(houghImage, houghThreshold, rmax, rmax);
 
-	cout << "Number of points: " << points.size();
+	return points;
 }
 
-void loadGroundTruth(float locations[16][15][4], String path) {
+vector<DartboardLocation> getFacesPoints(vector<Rect> faces) {
+	vector<DartboardLocation> points;
 
-	for(int nameNum = 0; nameNum <= 15; nameNum++) {
+	for(std::size_t i=0; i<faces.size(); ++i) {
+		Rect rect = faces[i];
 
-		String name = path + "dart" + to_string(nameNum) + ".txt";
-		ifstream file(name);
+		int center_X = rect.x + rect.width / 2;
+		int center_Y = rect.y + rect.height / 2;
 
-		if(file.is_open()) {
-			String line;
-			int lineNum = 0;
-			while(getline(file, line)) {
-
-				stringstream stream(line);
-				float loc[5] =  {};
-
-				for(int i=0; i<5; i++) {
-					stream >> loc[i];
-				}
-
-				for(int i=0; i<4; i++) {
-					locations[nameNum][lineNum][i] = loc[i+1];
-				}
-				lineNum++;
-			}
-		}
-		file.close();
+		points.insert(points.end(), DartboardLocation(center_X, center_Y, rect.width, rect.height));
 	}
+
+	return points;
+}
+
+vector<DartboardLocation> loadGroundTruth(String path, Mat frame, int picNum) {
+
+	vector<DartboardLocation> locations;
+	String name = path + "dart" + to_string(picNum) + ".txt";
+	ifstream file(name);
+
+	if(file.is_open()) {
+		String line;
+		int lineNum = 0;
+		while(getline(file, line)) {
+
+			DartboardLocation location;
+
+			stringstream stream(line);
+			float input[5] =  {};
+
+			for(int i=0; i<5; i++) {
+				stream >> input[i];
+			}
+
+			location.width = input[3] * frame.cols;
+			location.height = input[4] * frame.rows;
+			location.x = input[1] * frame.cols;
+			location.y = input[2] * frame.rows;
+
+			locations.insert(locations.end(), location);
+
+			lineNum++;
+		}
+	}
+	file.close();
+
+	return locations;
 }
 
 /** @function detectAndDisplay */
-vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, float locations[16][15][4], int imageIndex)
+vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex)
 {
 	vector<Rect> faces;
 
@@ -196,35 +258,25 @@ vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, float locations[16][15
 		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
 	}
 
-	for(int i = 0; i < 15; i++){
-		float truthX = locations[imageIndex][i][0] * frame_gray.cols;
-		float truthY = locations[imageIndex][i][1] * frame_gray.rows;
-		float truthW = locations[imageIndex][i][2] * frame_gray.cols;
-		float truthH = locations[imageIndex][i][3] * frame_gray.rows;
+	for(int i = 0; i < groundTruth.size(); i++){
 
-		locations[imageIndex][i][0] = truthX;
-		if(truthX == 0) break;
-		locations[imageIndex][i][1] = truthY;
-		locations[imageIndex][i][2] = truthW;
-		locations[imageIndex][i][3] = truthH;
-
-		float x = truthX - truthW / 2.0f;
-		float y = truthY - truthH / 2.0f;
+		DartboardLocation location = groundTruth[i];
+		float x = location.x - location.width / 2.0f;
+		float y = location.y - location.height / 2.0f;
 		
-		rectangle(frame, Point(x, y), Point(x + truthW, y + truthH), Scalar( 0, 0, 255 ), 2);
+		rectangle(frame, Point(x, y), Point(x + location.width, y + location.height), Scalar( 0, 0, 255 ), 2);
 	}
 
 	return faces;
 
 }
 
-map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces) {
+map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<Rect> faces) {
 
 	map<int, float> facesToIou;
 
-	for(int faceNum=0; faceNum < 15; faceNum++) {
-		float *trueFace = trueFaces[faceNum];
-		if(trueFace[0] == 0) break;
+	for(int faceNum=0; faceNum < trueFaces.size(); faceNum++) {
+		DartboardLocation trueFace = trueFaces[faceNum];
 
 		float maxIOU = -1;
 
@@ -232,17 +284,17 @@ map<int, float> calculateIOU(float trueFaces[15][4], vector<Rect> faces) {
 
 			Rect decFace = faces[decNum];
 
-			int trueRight = trueFace[0] + trueFace[2] / 2.0;
-			int trueLeft = trueFace[0] - trueFace[2] / 2.0;
-			int trueBottom = trueFace[1] + trueFace[3] / 2.0;
-			int trueTop = trueFace[1] - trueFace[3] / 2.0;
+			int trueRight = trueFace.x + trueFace.width / 2.0;
+			int trueLeft = trueFace.x - trueFace.width / 2.0;
+			int trueBottom = trueFace.y + trueFace.height / 2.0;
+			int trueTop = trueFace.y - trueFace.height / 2.0;
 	
 			int xOverlap = max(0, min(trueRight, decFace.x + decFace.width) - max(trueLeft, decFace.x));
 			int yOverlap = max(0, min(trueBottom, decFace.y + decFace.height) - max(trueTop, decFace.y));
 
 			int overlapArea = xOverlap * yOverlap;
 
-			int unionArea = trueFace[2] * trueFace[3] + decFace.width * decFace.height - overlapArea;
+			int unionArea = trueFace.width * trueFace.height + decFace.width * decFace.height - overlapArea;
 
 			float IOU = (float) overlapArea / (float) unionArea;
 

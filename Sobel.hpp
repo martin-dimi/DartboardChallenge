@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "includes.h"
+#include "DartboardLocation.cpp"
 
 #define _USE_MATH_DEFINES
 
@@ -14,7 +15,7 @@ Mat calculateGradientMagnitude(Mat &dx, Mat &dy);
 Mat calculateGradientDirection(Mat &dx, Mat &dy);
 int ***calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int threshold);
 Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax);
-vector<tuple<int, int>> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY);
+vector<DartboardLocation> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY);
 
 Mat calculateDx(Mat &image);
 Mat calculateDy(Mat &image);
