@@ -44,6 +44,12 @@ class DartboardLocation {
 
     // Get the average point between two given
     static DartboardLocation getAverageLocation(DartboardLocation point1, DartboardLocation point2) {
-        return DartboardLocation((point1.x + point2.x)/2, (point1.y + point2.y)/2);
+        int x = (point1.x + point2.x)/2;
+        int y = (point1.y + point2.y)/2;
+
+        int width = (point1.width + point2.width) / 2;
+        int height = (point1.height + point2.height) / 2;
+
+        return DartboardLocation(x, y, width, height);
     }
 };

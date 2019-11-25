@@ -90,6 +90,19 @@ uchar normaliseUcharGray(float max, float min, int x) {
     return (uchar) ((x + min) * 256.0 / (max-min) + min);
 }
 
+int **malloc2dArray(int dim1, int dim2)
+{
+    int i, j;
+    int **array = (int **) malloc(dim1 * sizeof(int *));
+
+    for (i = 0; i < dim1; i++) {
+        array[i] = (int *) malloc(dim2 * sizeof(int));
+        memset(array[i], 0, dim2*sizeof(int));
+    }
+
+    return array;
+}
+
 int ***malloc3dArray(int dim1, int dim2, int dim3)
 {
     int i, j, k;
@@ -123,7 +136,7 @@ int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int thresh
 
             float dir = direction.at<float>(x,y);
 
-            for(int radius = 10; radius < radiusMax; radius++) {
+            for(int radius = 10; radius < radiusMax; radius+=2) {
 
                 int x0p = x + radius * cos(dir);
                 int x0m = x - radius * cos(dir);
@@ -182,7 +195,39 @@ Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
     return houghImage;
 }
 
-vector<DartboardLocation> getCenterPoints(Mat houghImage, int threshold, int deletionLengthX, int deletionLengthY) {
+tuple<Mat, int**> flattenHough(int ***hough, int rows, int cols, int radiusMax) {
+    Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
+    int **maxVotesRadius = malloc2dArray(rows, cols);
+
+    for(int x = 1; x < rows-1; x++) {	
+        for(int y = 1; y < cols-1; y++) {
+            float result = 0;
+            int maxVotes = -1;
+            int rad;
+
+            for(int r = 0; r < radiusMax; r++) {
+                int votes = hough[x][y][r];
+                result += votes;
+                if(votes > maxVotes) {
+                    maxVotes = votes;
+                    rad = r;
+                } 
+            }
+
+            maxVotesRadius[x][y] = rad;
+
+            // Colapse the 3d Hough transform into 2d
+            houghImage.at<float>(x,y) = result;
+
+        }
+    }
+
+    houghImage = imageWrite(houghImage, "houghSpace.jpg");
+
+    return {houghImage, maxVotesRadius};
+}
+
+vector<DartboardLocation> getCenterPoints(Mat houghImage, int** radiusVotes, int threshold, int deletionLengthX, int deletionLengthY) {
 
     int rows = houghImage.rows;
     int cols = houghImage.cols;
@@ -211,7 +256,8 @@ vector<DartboardLocation> getCenterPoints(Mat houghImage, int threshold, int del
 
         if(max >= threshold) {
             // Save the location coordinates
-            DartboardLocation loc = DartboardLocation(locY, locX);
+            int radius = radiusVotes[locX][locY];
+            DartboardLocation loc = DartboardLocation(locY, locX, radius*2, radius*2);
             locations.insert(locations.end(), loc);
             found = true;
 

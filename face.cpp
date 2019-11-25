@@ -75,7 +75,7 @@ int main( int argc, const char** argv )
 	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 6;
+	int ind =4;
 	for(int imageIndex = ind; imageIndex < ind+1; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
@@ -139,8 +139,6 @@ vector<DartboardLocation> calculateEstimatedPoints(vector<DartboardLocation> fac
 			if(dist < minDistance) {
 				minDistance = dist;
 				bestEstimate = DartboardLocation::getAverageLocation(houghPoint, facePoint);
-				bestEstimate.width = facePoint.width;
-				bestEstimate.height = facePoint.height;
 			}
 		}
 
@@ -184,9 +182,11 @@ vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
 	imageWrite(gradientDir, "gradientDir.jpg");
 
 	int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
-	Mat houghImage = visualiseHough(hough, rows, cols, rmax);
+	tuple<Mat, int**> flatHoughSpace = flattenHough(hough, rows, cols, rmax);
+	Mat houghImage = get<0>(flatHoughSpace);
+	int** radiusVotes = get<1>(flatHoughSpace);
 
-	vector<DartboardLocation> points = getCenterPoints(houghImage, houghThreshold, rmax, rmax);
+	vector<DartboardLocation> points = getCenterPoints(houghImage, radiusVotes, houghThreshold, rmax, rmax);
 
 	return points;
 }
