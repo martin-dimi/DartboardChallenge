@@ -75,7 +75,7 @@ int main( int argc, const char** argv )
 	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 7;
+	int ind = 6;
 	for(int imageIndex = 0; imageIndex < 16; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
@@ -180,6 +180,10 @@ vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
 	imageWrite(dyImage, "dy.jpg");
 	imageWrite(gradientMag, "gradientMag.jpg");
 	imageWrite(gradientDir, "gradientDir.jpg");
+
+	// Mat edges =  Mat(frame_gray.size(), CV_32FC1);
+	// Canny(frame_gray, edges, 120, 120*3);
+	// Mat e = imageWrite(edges, "Canny.jpg");
 
 	int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
 	tuple<Mat, int**> flatHoughSpace = flattenHough(hough, rows, cols, rmax);
