@@ -173,6 +173,7 @@ int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int thresh
     return hough;
 }
 
+
 Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
     Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
 

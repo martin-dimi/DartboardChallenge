@@ -75,8 +75,8 @@ int main( int argc, const char** argv )
 	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind =4;
-	for(int imageIndex = ind; imageIndex < ind+1; imageIndex++) {
+	int ind = 7;
+	for(int imageIndex = 0; imageIndex < 16; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
 		String image_path = input_image_path + name;
@@ -119,7 +119,7 @@ void displayDetections(vector<DartboardLocation> locations, Mat frame) {
 		int x = loc.x - loc.width/2;
 		int y = loc.y - loc.height/2;
 
-		cv::rectangle(frame, Point(x, y), Point(x + loc.width, y + loc.height), Scalar( 255, 255, 0 ), 2);
+		cv::rectangle(frame, Point(x, y), Point(x + loc.width, y + loc.height), Scalar( 255, 255, 255 ), 2);
 	}
 }
 
