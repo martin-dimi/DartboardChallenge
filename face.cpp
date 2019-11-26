@@ -83,7 +83,7 @@ int main( int argc, const char** argv )
 		Mat frame = imread(image_path, IMREAD_COLOR);
 		Mat frame_gray;
 		cvtColor( frame, frame_gray, CV_BGR2GRAY );
-		equalizeHist( frame_gray, frame_gray );
+		// equalizeHist( frame_gray, frame_gray );
 
 		// Detect Faces and Display Result
 		vector<DartboardLocation> groundTruth = loadGroundTruth(groundTruthPath, frame, imageIndex);

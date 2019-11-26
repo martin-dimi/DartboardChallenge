@@ -33,7 +33,6 @@ Mat imageWrite(Mat &image, std::string imagename){
 }
 
 Mat calculateGradientMagnitude(Mat &dx, Mat &dy) {
-
     Mat mag = Mat(dx.size(), CV_32FC1);
 
      for(int x = 1; x < mag.rows - 1; x++) {	
@@ -41,7 +40,7 @@ Mat calculateGradientMagnitude(Mat &dx, Mat &dy) {
             float dxx = dx.at<float>(x,y);
             float dyy = dy.at<float>(x,y);
 
-            mag.at<float>(x,y) =  sqrt(dxx*dxx + dyy*dyy);
+            mag.at<float>(x,y) = sqrt(dxx*dxx + dyy*dyy);
         }
      }
 
