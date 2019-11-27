@@ -53,11 +53,7 @@ Mat calculateGradientDirection(Mat &dx, Mat &dy) {
 
     for(int x = 1; x < dir.rows - 1; x++) {	
         for(int y = 1; y < dir.cols - 1; y++) {
-            float result = atan2(dx.at<float>(x,y),  dy.at<float>(x,y));
-
-            dir.at<float>(x,y) = result;
-            float temp = dir.at<float>(x,y);
-            // printf("Dir: %f, Temp: %f\n", result, temp);
+            dir.at<float>(x,y) = atan2(dx.at<float>(x,y),  dy.at<float>(x,y));;
         }
     }
 
@@ -116,6 +112,67 @@ int ***malloc3dArray(int dim1, int dim2, int dim3)
 
     }
     return array;
+}
+
+int** calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold) {
+    int rows = magnitude.rows;
+    int cols = magnitude.cols;
+
+    int** hough = malloc2dArray(rows, cols);
+    Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
+
+    for(int row = 1; row < magnitude.rows - 1; row++) {	
+        for(int col = 1; col < magnitude.cols - 1; col++) {
+
+            if(magnitude.at<float>(row,col) <= threshold) {
+                // TODO move this function out of here. Instead we just check if the mag == 0;
+                magnitude.at<float>(row,col) = 0;
+                continue;
+            }
+
+            float dir = direction.at<float>(row,col);
+            printf("Gradient %f\n", dir);
+            
+            for(int delta = 0; delta < offset; delta++) {
+                
+                if(abs(dir) < 1.5708f) {
+                    int xOffset = col + delta * cos(dir);
+                    int yOffset = row + delta * sin(dir);
+
+                    if(xOffset > 0 && xOffset < cols && yOffset > 0 && yOffset < rows) {
+                        houghImage.at<float>(yOffset,xOffset) += 1;
+                    }
+
+                    xOffset = col - delta * cos(dir);
+                    yOffset = row - delta * sin(dir);
+
+                    if(xOffset > 0 && xOffset < cols && yOffset > 0 && yOffset < rows){
+                        houghImage.at<float>(yOffset,xOffset) += 1;
+                    }
+                }
+                else {
+                    int xOffset = col + delta * cos(dir);
+                    int yOffset = row - delta * sin(dir);
+
+                    if(xOffset > 0 && xOffset < cols && yOffset > 0 && yOffset < rows) {
+                        houghImage.at<float>(yOffset,xOffset) += 1;
+                    }
+
+                    xOffset = col - delta * cos(dir);
+                    yOffset = row + delta * sin(dir);
+
+                    if(xOffset > 0 && xOffset < cols && yOffset > 0 && yOffset < rows){
+                        houghImage.at<float>(yOffset,xOffset) += 1;
+                    }
+                }
+            }
+
+        }
+    }
+
+    imageWrite(magnitude, "gradientMagThreshold.jpg");
+    imageWrite(houghImage, "houghSpaceLines.jpg");
+    return hough;
 }
 
 int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int threshold) {
