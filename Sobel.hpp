@@ -13,10 +13,10 @@ int ***malloc3dArray(int dim1, int dim2, int dim3);
 
 Mat calculateGradientMagnitude(Mat &dx, Mat &dy);
 Mat calculateGradientDirection(Mat &dx, Mat &dy);
-int** calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold);
+Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold);
 int ***calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int threshold);
 Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax);
-tuple<Mat, int**> flattenHough(int ***hough, int rows, int cols, int radiusMax);
+tuple<Mat, int**> flattenHough(int ***hough, int rows, int cols, int radiusMax, Mat lineHough);
 vector<DartboardLocation> getCenterPoints(Mat houghImage, int** radiusVotes, int threshold, int deletionLengthX, int deletionLengthY);
 
 Mat calculateDx(Mat &image);

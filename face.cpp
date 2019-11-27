@@ -75,7 +75,7 @@ int main( int argc, const char** argv )
 	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 10;
+	int ind = 11;
 	for(int imageIndex = ind; imageIndex < ind+1; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
@@ -85,25 +85,25 @@ int main( int argc, const char** argv )
 		cvtColor( frame, frame_gray, CV_BGR2GRAY );
 		// equalizeHist( frame_gray, frame_gray );
 
-		// // Detect Faces and Display Result
-		// vector<DartboardLocation> groundTruth = loadGroundTruth(groundTruthPath, frame, imageIndex);
-		// vector<Rect> faces = detectAndDisplay(frame, frame_gray, groundTruth, imageIndex);
-		// vector<DartboardLocation> facePoints = getFacesPoints(faces);
+		// Detect Faces and Display Result
+		vector<DartboardLocation> groundTruth = loadGroundTruth(groundTruthPath, frame, imageIndex);
+		vector<Rect> faces = detectAndDisplay(frame, frame_gray, groundTruth, imageIndex);
+		vector<DartboardLocation> facePoints = getFacesPoints(faces);
 
-		// // Calculate perfomance
-		// tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth, faces);
-		// float TPR = get<0>(performance);
-		// float F1  = get<1>(performance);
-		// cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
+		// Calculate perfomance
+		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth, faces);
+		float TPR = get<0>(performance);
+		float F1  = get<1>(performance);
+		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
 		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray);
-		// vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
+		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
 
-		// displayDetections(estimatedPoints, frame);
+		displayDetections(estimatedPoints, frame);
 
-		// // 4. Save Result Image
-		// String outputName = isDartboardLocation ? "dart_" : "face_";
-		// imwrite(output_image_path + outputName + name, frame );
+		// 4. Save Result Image
+		String outputName = isDartboardLocation ? "dart_" : "face_";
+		imwrite(output_image_path + outputName + name, frame );
 	}
 	// overallTPR /= 16;
 	// overallF1  /= 16;
@@ -185,15 +185,15 @@ vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
 	// Canny(frame_gray, edges, 120, 120*3);
 	// Mat e = imageWrite(edges, "Canny.jpg");
 
-	// int ***hough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);
-	calculateLineHough(gradientMag, gradientDir, 25, magThreshold);
+	int ***circleHough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);	
+	Mat lineHough = calculateLineHough(gradientMag, gradientDir, 20, magThreshold);
 
-	// tuple<Mat, int**> flatHoughSpace = flattenHough(hough, rows, cols, rmax);
-	// Mat houghImage = get<0>(flatHoughSpace);
-	// int** radiusVotes = get<1>(flatHoughSpace);
+	tuple<Mat, int**> flatHoughSpace = flattenHough(circleHough, rows, cols, rmax, lineHough);
+	int** radiusVotes = get<1>(flatHoughSpace);
+	Mat houghSpace = get<0>(flatHoughSpace);
 
-	// vector<DartboardLocation> points = getCenterPoints(houghImage, radiusVotes, houghThreshold, rmax, rmax);
-	vector<DartboardLocation> points;
+
+	vector<DartboardLocation> points = getCenterPoints(houghSpace, radiusVotes, houghThreshold, rmax, rmax);
 
 	return points;
 }

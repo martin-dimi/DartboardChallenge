@@ -114,15 +114,14 @@ int ***malloc3dArray(int dim1, int dim2, int dim3)
     return array;
 }
 
-int** calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold) {
+Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold) {
     int rows = magnitude.rows;
     int cols = magnitude.cols;
 
-    int** hough = malloc2dArray(rows, cols);
     Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
 
-    for(int row = 1; row < magnitude.rows - 1; row++) {	
-        for(int col = 1; col < magnitude.cols - 1; col++) {
+    for(int row = 1; row < magnitude.rows - 1; row ++) {	
+        for(int col = 1; col < magnitude.cols - 1; col ++) {
 
             if(magnitude.at<float>(row,col) <= threshold) {
                 // TODO move this function out of here. Instead we just check if the mag == 0;
@@ -131,7 +130,6 @@ int** calculateLineHough(Mat& magnitude, Mat& direction, float offset, int thres
             }
 
             float dir = direction.at<float>(row,col);
-            printf("Gradient %f\n", dir);
             
             for(int delta = 0; delta < offset; delta++) {
                 
@@ -172,7 +170,7 @@ int** calculateLineHough(Mat& magnitude, Mat& direction, float offset, int thres
 
     imageWrite(magnitude, "gradientMagThreshold.jpg");
     imageWrite(houghImage, "houghSpaceLines.jpg");
-    return hough;
+    return houghImage;
 }
 
 int *** calculateHough(Mat& magnitude, Mat& direction, int radiusMax, int threshold) {
@@ -252,7 +250,7 @@ Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
     return houghImage;
 }
 
-tuple<Mat, int**> flattenHough(int ***hough, int rows, int cols, int radiusMax) {
+tuple<Mat, int**> flattenHough(int ***hough, int rows, int cols, int radiusMax, Mat lineHough) {
     Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
     int **maxVotesRadius = malloc2dArray(rows, cols);
 
