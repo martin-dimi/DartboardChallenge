@@ -1,4 +1,4 @@
 /negatives
 a.out
 /*.jpg
-/output/*.jpg
+.vscode/
