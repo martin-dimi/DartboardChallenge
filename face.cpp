@@ -25,6 +25,8 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgproc/imgproc_c.h>
 
+#include <opencv2/core/utils/filesystem.hpp>
+
 #include <iostream>
 #include <stdio.h>
 
@@ -44,7 +46,7 @@ int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
 tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<Rect> faces);
 
-vector<DartboardLocation> calculateHoughSpace(Mat frame_gray);
+vector<DartboardLocation> calculateHoughSpace(Mat frame_gray, String name);
 vector<DartboardLocation> getFacesPoints(vector<Rect> faces);
 vector<DartboardLocation> calculateEstimatedPoints(vector<DartboardLocation> facePoints, vector<DartboardLocation> houghPoints);
 void displayDetections(vector<DartboardLocation> locations, Mat frame);
@@ -54,6 +56,12 @@ String input_image_path = "images/";
 String output_image_path = "output/";
 String face_path = "GroundTruth_Face/";
 String dart_path = "GroundTruth_Dart/";
+String mag_path = "magnitudes/";
+String dir_path = "directions/";
+String circle_hough_path = "circleHoughs/";
+String line_hough_path = "lineHoughs/";
+String intersection_hough_path = "intersectionHoughs/";
+String combined_hough_path = "combinedHoughs/";
 
 String DartboardLocation_classifier = "dartcascade/cascade.xml";
 String face_classifier = "frontalface.xml";
@@ -71,12 +79,13 @@ int main( int argc, const char** argv )
 	float overallTPR = 0;
 	float overallF1  = 0;
 
+	int ind = atoi(argv[1]);
+
 	// Load the Strong Classifier in a structure called `Cascade'
 	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	int ind = 11;
-	for(int imageIndex = ind; imageIndex < ind+1; imageIndex++) {
+	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
 		String image_path = input_image_path + name;
@@ -96,7 +105,7 @@ int main( int argc, const char** argv )
 		float F1  = get<1>(performance);
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
-		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray);
+		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray, name);
 		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
 
 		displayDetections(estimatedPoints, frame);
@@ -163,10 +172,11 @@ tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<Dartb
 	return {TPR, F1};
 }
 
-vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
+vector<DartboardLocation> calculateHoughSpace(Mat frame_gray, String name) {
 	// Calculating Dx and Dy
 	Mat dxImage = calculateDx(frame_gray);
 	Mat dyImage = calculateDy(frame_gray); 
+
 	Mat gradientMag = calculateGradientMagnitude(dxImage, dyImage);
 	Mat gradientDir = calculateGradientDirection(dxImage, dyImage);
 
@@ -174,27 +184,33 @@ vector<DartboardLocation> calculateHoughSpace(Mat frame_gray) {
     int cols = frame_gray.cols;
 	int rmax = 200;
 	int magThreshold = 200; 
-	int houghThreshold = 200;
+	int houghThreshold = 170;
 
-	imageWrite(dxImage, "dx.jpg");
-	imageWrite(dyImage, "dy.jpg");
-	imageWrite(gradientMag, "gradientMag.jpg");
-	imageWrite(gradientDir, "gradientDir.jpg");
+	// imageWrite(dxImage, "dx.jpg");
+	// imageWrite(dyImage, "dy.jpg");
+	imageWrite(gradientMag, mag_path + name);
+	imageWrite(gradientDir, dir_path + name);
 
 	// Mat edges =  Mat(frame_gray.size(), CV_32FC1);
 	// Canny(frame_gray, edges, 120, 120*3);
 	// Mat e = imageWrite(edges, "Canny.jpg");
 
-	int ***circleHough = calculateHough(gradientMag, gradientDir, rmax, magThreshold);	
-	Mat lineHough = calculateLineHough(gradientMag, gradientDir, 20, magThreshold);
+	// Create Hough Spaces
+	int ***circleHough3d = calculateCircleHough(gradientMag, gradientDir, rmax, magThreshold);	
+	Mat intersectionHough = calculateIntersectionHough(gradientMag, gradientDir, 20, magThreshold);
+	Mat lineHough = calculateLineHough(gradientMag, gradientDir, 10, magThreshold);
 
-	tuple<Mat, int**> flatHoughSpace = flattenHough(circleHough, rows, cols, rmax, lineHough);
-	int** radiusVotes = get<1>(flatHoughSpace);
-	Mat houghSpace = get<0>(flatHoughSpace);
+	tuple<Mat, Mat, int**> houghOutput = combineHoughSpaces(circleHough3d, intersectionHough, rows, cols, rmax);
+	int** radiusVotes = get<2>(houghOutput);
+	Mat circleHough = get<1>(houghOutput);
+	Mat combinedHough = get<0>(houghOutput);
+	
+	imageWrite(lineHough, line_hough_path + name);
+	imageWrite(circleHough, circle_hough_path + name);
+	imageWrite(intersectionHough, intersection_hough_path + name);
+	imageWrite(combinedHough, combined_hough_path + name);
 
-
-	vector<DartboardLocation> points = getCenterPoints(houghSpace, radiusVotes, houghThreshold, rmax, rmax);
-
+	vector<DartboardLocation> points = getCenterPoints(combinedHough, radiusVotes, houghThreshold, rmax, rmax);
 	return points;
 }
 
