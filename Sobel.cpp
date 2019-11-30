@@ -293,6 +293,36 @@ tuple<Mat, Mat, int**> combineHoughSpaces(int ***hough,  Mat intersectionHough, 
     for(int x = 1; x < rows-1; x++) {	
         for(int y = 1; y < cols-1; y++) {
             float result = 0;
+
+            // int size = 10;
+            // int maxVotes[size] = {};
+            // int rad[size] = {};
+
+            // for(int r = 0; r < radiusMax; r++){
+            //     int votes = hough[x][y][r];
+            //     result += votes;
+            //     int i = 0;
+            //     if(votes > maxVotes[0]){
+            //         i = 1;
+            //         while(votes > maxVotes[i] && i < size) i++;
+            //         for(int j = 0; j < i - 1; j++){
+            //             maxVotes[j] = maxVotes[j + 1];
+            //             rad[j] = rad[j + 1];
+            //         }
+            //         maxVotes[i - 1] = votes;
+            //         rad[i - 1] = r;
+            //     }
+            // }
+
+            // int radiusSum = 0;
+            // int i = size - 1;
+            // while(i >= 0 && maxVotes[i] > 0){
+            //     radiusSum += maxVotes[i];
+            //     i--;
+            // }
+
+            // maxVotesRadius[x][y] = radiusSum / (size - i);
+            
             int maxVotes = -1;
             int rad;
 
