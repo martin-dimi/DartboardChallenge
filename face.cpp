@@ -71,9 +71,9 @@ CascadeClassifier cascade;
 /** @function main */
 int main( int argc, const char** argv )
 {
-	bool isDartboardLocation = true;
+	bool isDetectingDartboard = true;
 
-	String groundTruthPath = isDartboardLocation ? dart_path : face_path;
+	String groundTruthPath = isDetectingDartboard ? dart_path : face_path;
 
 	// The average TPR and F1 of all images
 	float overallTPR = 0;
@@ -82,7 +82,7 @@ int main( int argc, const char** argv )
 	int ind = atoi(argv[1]);
 
 	// Load the Strong Classifier in a structure called `Cascade'
-	String cascadeName = isDartboardLocation ? DartboardLocation_classifier : face_classifier;
+	String cascadeName = isDetectingDartboard ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
 	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
@@ -105,19 +105,22 @@ int main( int argc, const char** argv )
 		float F1  = get<1>(performance);
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
+		overallTPR += TPR;
+		overallF1 += F1;
+
 		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray, name);
 		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
 
 		displayDetections(estimatedPoints, frame);
 
 		// 4. Save Result Image
-		String outputName = isDartboardLocation ? "dart_" : "face_";
+		String outputName = isDetectingDartboard ? "dart_" : "face_";
 		imwrite(output_image_path + outputName + name, frame );
 	}
-	// overallTPR /= 16;
-	// overallF1  /= 16;
+	overallTPR /= 16;
+	overallF1  /= 16;
 
-	// printf("Overall TRP: %f%, overall F1: %f%", overallTPR, overallF1);
+	printf("Overall TRP: %f%, overall F1: %f%", overallTPR, overallF1);
 
 	return 0;
 }
