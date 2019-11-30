@@ -30,6 +30,22 @@ class DartboardLocation {
         this->height = height;
     }    
 
+    int getLeft() {
+        return x - width/2;
+    }
+
+    int getRight() {
+        return x + width/2;
+    }
+
+    int getBottom() {
+        return y + height/2;
+    }
+
+    int getTop() {
+        return y - height/2;
+    }
+
     string to_string() {
         ostringstream strout;
         strout << "X: " << x << ", Y:" << y;

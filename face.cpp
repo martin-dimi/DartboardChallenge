@@ -37,14 +37,13 @@ using namespace cv;
 
 /** Function Headers */
 vector<DartboardLocation> loadGroundTruth(String path, Mat frame, int ind);
-vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex);
+vector<DartboardLocation> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex);
 
-map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<Rect> faces);
-
+map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<DartboardLocation> faces);
 int getCorrectFaceCount(map<int, float> IOU, float IOUThreshold);
 
 tuple<float, float> TPRandF1(int correctFaceCount, int groundTruthFaces, int predictedFaces);
-tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<Rect> faces);
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<DartboardLocation> faces);
 
 vector<DartboardLocation> calculateHoughSpace(Mat frame_gray, String name);
 vector<DartboardLocation> getFacesPoints(vector<Rect> faces);
@@ -85,7 +84,7 @@ int main( int argc, const char** argv )
 	String cascadeName = isDetectingDartboard ? DartboardLocation_classifier : face_classifier;
 	if( !cascade.load( cascadeName ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	for(int imageIndex = ind; imageIndex < ind + 1; imageIndex++) {
+	for(int imageIndex = 0; imageIndex < 16; imageIndex++) {
 		// Prepare Image by turning it into Grayscale and normalising lighting
 		String name = "dart" + to_string(imageIndex) + ".jpg";
 		String image_path = input_image_path + name;
@@ -96,22 +95,21 @@ int main( int argc, const char** argv )
 
 		// Detect Faces and Display Result
 		vector<DartboardLocation> groundTruth = loadGroundTruth(groundTruthPath, frame, imageIndex);
-		vector<Rect> faces = detectAndDisplay(frame, frame_gray, groundTruth, imageIndex);
-		vector<DartboardLocation> facePoints = getFacesPoints(faces);
+		vector<DartboardLocation> facePoints = detectAndDisplay(frame, frame_gray, groundTruth, imageIndex);
+
+		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray, name);
+		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
+
+		displayDetections(estimatedPoints, frame);
 
 		// Calculate perfomance
-		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth, faces);
+		tuple<float, float> performance = calculatePerformance(frame, frame_gray, groundTruth, estimatedPoints);
 		float TPR = get<0>(performance);
 		float F1  = get<1>(performance);
 		cout << "Image: " << imageIndex << ", TPR: " << TPR << "%, F1: " << F1 << "%\n";
 
 		overallTPR += TPR;
 		overallF1 += F1;
-
-		vector<DartboardLocation> houghPoints = calculateHoughSpace(frame_gray, name);
-		vector<DartboardLocation> estimatedPoints = calculateEstimatedPoints(facePoints, houghPoints);
-
-		displayDetections(estimatedPoints, frame);
 
 		// 4. Save Result Image
 		String outputName = isDetectingDartboard ? "dart_" : "face_";
@@ -131,7 +129,7 @@ void displayDetections(vector<DartboardLocation> locations, Mat frame) {
 		int x = loc.x - loc.width/2;
 		int y = loc.y - loc.height/2;
 
-		cv::rectangle(frame, Point(x, y), Point(x + loc.width, y + loc.height), Scalar( 255, 255, 255 ), 2);
+		cv::rectangle(frame, Point(x, y), Point(x + loc.width, y + loc.height), Scalar( 0, 255, 0 ), 2);
 	}
 }
 
@@ -154,17 +152,18 @@ vector<DartboardLocation> calculateEstimatedPoints(vector<DartboardLocation> fac
 			}
 		}
 
-		cout << "Min dist: " << minDistance << "\n";
+		// cout << "Min dist: " << minDistance << "\n";
 		points.insert(points.end(), bestEstimate);
 	}
 	return points;
 }
 
-tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<Rect> faces) {
+tuple<float, float> calculatePerformance(Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, vector<DartboardLocation> faces) {
 	// cout << "Calculating IOU for " << imageIndex << "\n";
 	map<int, float> IOU = calculateIOU(groundTruth, faces);
+	int threshold = 40;
 
-	int correctFacesCount = getCorrectFaceCount(IOU, 40.0f);
+	int correctFacesCount = getCorrectFaceCount(IOU, threshold);
 	int groundTruthFaces = IOU.size();
 	int predictedFaces = faces.size();
 
@@ -268,7 +267,7 @@ vector<DartboardLocation> loadGroundTruth(String path, Mat frame, int picNum) {
 }
 
 /** @function detectAndDisplay */
-vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex)
+vector<DartboardLocation> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocation> groundTruth, int imageIndex)
 {
 	vector<Rect> faces;
 
@@ -279,10 +278,10 @@ vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocati
 	// cout << faces.size() << std::endl;
 
 	// 4. Draw box around faces found
-	for( int i = 0; i < faces.size(); i++ )
-	{
-		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
-	}
+	// for( int i = 0; i < faces.size(); i++ )
+	// {
+	// 	rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
+	// }
 
 	for(int i = 0; i < groundTruth.size(); i++){
 
@@ -293,11 +292,11 @@ vector<Rect> detectAndDisplay( Mat frame, Mat frame_gray, vector<DartboardLocati
 		rectangle(frame, Point(x, y), Point(x + location.width, y + location.height), Scalar( 0, 0, 255 ), 2);
 	}
 
-	return faces;
+	return getFacesPoints(faces);
 
 }
 
-map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<Rect> faces) {
+map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<DartboardLocation> faces) {
 
 	map<int, float> facesToIou;
 
@@ -308,15 +307,15 @@ map<int, float> calculateIOU(vector<DartboardLocation> trueFaces, vector<Rect> f
 
 	 	for(int decNum = 0; decNum < faces.size(); decNum++) {
 
-			Rect decFace = faces[decNum];
+			DartboardLocation decFace = faces[decNum];
 
 			int trueRight = trueFace.x + trueFace.width / 2.0;
 			int trueLeft = trueFace.x - trueFace.width / 2.0;
 			int trueBottom = trueFace.y + trueFace.height / 2.0;
 			int trueTop = trueFace.y - trueFace.height / 2.0;
 	
-			int xOverlap = max(0, min(trueRight, decFace.x + decFace.width) - max(trueLeft, decFace.x));
-			int yOverlap = max(0, min(trueBottom, decFace.y + decFace.height) - max(trueTop, decFace.y));
+			int xOverlap = max(0, min(trueFace.getRight(), decFace.getRight()) - max(trueFace.getLeft(), decFace.getLeft()));
+			int yOverlap = max(0, min(trueFace.getBottom(), decFace.getBottom()) - max(trueFace.getTop(), decFace.getTop()));
 
 			int overlapArea = xOverlap * yOverlap;
 
