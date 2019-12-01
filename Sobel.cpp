@@ -27,12 +27,12 @@ Mat imageWrite(Mat &image, std::string imagename){
     Mat output = Mat(image.size(), image.type());
     normalize(image, output, 0, 255, NORM_MINMAX);
 
-    imwrite(imagename, output);
+    imwrite(imagename + ".jpg", output);
 
     return output;
 }
 
-Mat calculateGradientMagnitude(Mat &dx, Mat &dy) {
+Mat calculateGradientMagnitude(Mat &dx, Mat &dy, int threshold) {
     Mat mag = Mat(dx.size(), CV_32FC1);
 
      for(int x = 1; x < mag.rows - 1; x++) {	
@@ -40,7 +40,12 @@ Mat calculateGradientMagnitude(Mat &dx, Mat &dy) {
             float dxx = dx.at<float>(x,y);
             float dyy = dy.at<float>(x,y);
 
-            mag.at<float>(x,y) = sqrt(dxx*dxx + dyy*dyy);
+            float magnitude = sqrt(dxx*dxx + dyy*dyy);
+            if(magnitude < threshold) {
+                mag.at<float>(x,y) = 0;
+            } else {
+                mag.at<float>(x,y) = magnitude;
+            }
         }
      }
 
@@ -114,7 +119,7 @@ int ***malloc3dArray(int dim1, int dim2, int dim3)
     return array;
 }
 
-Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset, int threshold) {
+Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset) {
     int rows = magnitude.rows;
     int cols = magnitude.cols;
 
@@ -126,9 +131,7 @@ Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset, int thresho
     for(int row = 1; row < magnitude.rows - 1; row ++) {	
         for(int col = 1; col < magnitude.cols - 1; col ++) {
 
-            if(magnitude.at<float>(row,col) <= threshold) {
-                // TODO move this function out of here. Instead we just check if the mag == 0;
-                // magnitude.at<float>(row,col) = 0;
+            if(magnitude.at<float>(row,col) == 0) {
                 continue;
             }
 
@@ -152,7 +155,7 @@ Mat calculateLineHough(Mat& magnitude, Mat& direction, float offset, int thresho
     return houghImage;
 }
 
-Mat calculateIntersectionHough(Mat& magnitude, Mat& direction, float offset, int threshold) {
+Mat calculateIntersectionHough(Mat& magnitude, Mat& direction, float offset) {
     int rows = magnitude.rows;
     int cols = magnitude.cols;
 
@@ -161,9 +164,7 @@ Mat calculateIntersectionHough(Mat& magnitude, Mat& direction, float offset, int
     for(int row = 1; row < magnitude.rows - 1; row ++) {	
         for(int col = 1; col < magnitude.cols - 1; col ++) {
 
-            if(magnitude.at<float>(row,col) <= threshold) {
-                // TODO move this function out of here. Instead we just check if the mag == 0;
-                magnitude.at<float>(row,col) = 0;
+            if(magnitude.at<float>(row,col) <= 0) {
                 continue;
             }
             const float PI = 3.14f;
@@ -206,11 +207,10 @@ Mat calculateIntersectionHough(Mat& magnitude, Mat& direction, float offset, int
         }
     }
 
-    imageWrite(magnitude, "gradientMagThreshold.jpg");
     return houghImage;
 }
 
-int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax, int threshold) {
+int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax) {
     int rows = magnitude.rows;
     int cols = magnitude.cols;
 
@@ -219,9 +219,7 @@ int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax, int 
     for(int x = 1; x < magnitude.rows - 1; x++) {	
         for(int y = 1; y < magnitude.cols - 1; y++) {
 
-            if(magnitude.at<float>(x,y) <= threshold) {
-                // TODO move this function out of here. Instead we just check if the mag == 0;
-                magnitude.at<float>(x,y) = 0;
+            if(magnitude.at<float>(x,y) == 0) {
                 continue;
             }
 
@@ -240,16 +238,6 @@ int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax, int 
                     hough[x0p][y0p][radius - 10] += 1;
                 }
 
-                // // X+ Y-
-                // if(x0p >= 0 && x0p < rows && y0m >= 0 && y0m < cols) {
-                //     hough[x0p][y0m][radius - 10] += 1;
-                // }
-
-                // // X- Y+
-                // if(x0m >= 0 && x0m < rows && y0p >= 0 && y0p < cols) {
-                //     hough[x0m][y0p][radius - 10] += 1;
-                // }
-
                 // X- Y-
                 if(x0m >= 0 && x0m < rows && y0m >= 0 && y0m < cols) {
                     hough[x0m][y0m][radius - 10] += 1;
@@ -263,79 +251,42 @@ int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax, int 
     return hough;
 }
 
-
-Mat visualiseHough(int ***hough, int rows, int cols, int radiusMax) {
-    Mat houghImage = Mat(rows, cols, CV_32FC1, Scalar(0));
-
-    for(int x = 1; x < rows-1; x++) {	
-        for(int y = 1; y < cols-1; y++) {
-            float result = 0;
-            for(int r = 0; r < radiusMax; r++) {
-                result += hough[x][y][r];
-            }
-
-            // Colapse the 3d Hough transform into 2d
-            houghImage.at<float>(x,y) = result;
-            float temp = houghImage.at<float>(x,y);
-        }
-    }
-
-    houghImage = imageWrite(houghImage, "houghSpace.jpg");
-    imwrite("houghSpace.jpg", houghImage);
-
-    return houghImage;
-}
-
 tuple<Mat, Mat, int**> combineHoughSpaces(int ***hough,  Mat intersectionHough, int rows, int cols, int radiusMax) {
     Mat circleHough = Mat(rows, cols, CV_32FC1, Scalar(0));
     int **maxVotesRadius = malloc2dArray(rows, cols);
+    int size = 2;
 
     for(int x = 1; x < rows-1; x++) {	
         for(int y = 1; y < cols-1; y++) {
             float result = 0;
 
-            // int size = 10;
-            // int maxVotes[size] = {};
-            // int rad[size] = {};
+            int maxVotes[size] = {};
+            int rad[size] = {};
 
-            // for(int r = 0; r < radiusMax; r++){
-            //     int votes = hough[x][y][r];
-            //     result += votes;
-            //     int i = 0;
-            //     if(votes > maxVotes[0]){
-            //         i = 1;
-            //         while(votes > maxVotes[i] && i < size) i++;
-            //         for(int j = 0; j < i - 1; j++){
-            //             maxVotes[j] = maxVotes[j + 1];
-            //             rad[j] = rad[j + 1];
-            //         }
-            //         maxVotes[i - 1] = votes;
-            //         rad[i - 1] = r;
-            //     }
-            // }
-
-            // int radiusSum = 0;
-            // int i = size - 1;
-            // while(i >= 0 && maxVotes[i] > 0){
-            //     radiusSum += maxVotes[i];
-            //     i--;
-            // }
-
-            // maxVotesRadius[x][y] = radiusSum / (size - i);
-            
-            int maxVotes = -1;
-            int rad;
-
-            for(int r = 0; r < radiusMax; r++) {
+            for(int r = 15; r < radiusMax; r++){
                 int votes = hough[x][y][r];
                 result += votes;
-                if(votes > maxVotes) {
-                    maxVotes = votes;
-                    rad = r;
-                } 
+                int i = 0;
+                if(votes > maxVotes[0]){
+                    i = 1;
+                    while(votes > maxVotes[i] && i < size) i++;
+                    for(int j = 0; j < i - 1; j++){
+                        maxVotes[j] = maxVotes[j + 1];
+                        rad[j] = rad[j + 1];
+                    }
+                    maxVotes[i - 1] = votes;
+                    rad[i - 1] = r;
+                }
             }
 
-            maxVotesRadius[x][y] = rad;
+            int radiusSum = 0;
+            int i = size - 1;
+            while(i >= 0 && maxVotes[i] > 0){
+                radiusSum += rad[i];
+                i--;
+            }
+
+            maxVotesRadius[x][y] = radiusSum / (size - i - 1);
 
             // Colapse the 3d Hough transform into 2d
             circleHough.at<float>(x,y) = result;
@@ -353,6 +304,7 @@ tuple<Mat, Mat, int**> combineHoughSpaces(int ***hough,  Mat intersectionHough, 
     return {combinedHough, circleHough, maxVotesRadius};
 }
 
+// Extracts the center points from the given Hough Images
 vector<DartboardLocation> getCenterPoints(Mat houghImage, int** radiusVotes, int threshold, int deletionLengthX, int deletionLengthY) {
 
     int rows = houghImage.rows;
@@ -407,8 +359,6 @@ vector<DartboardLocation> getCenterPoints(Mat houghImage, int** radiusVotes, int
             }
         }
      } while (found);
-
-    imwrite("houghSpaceModiefied.jpg", houghImage);
 
     return locations;
 }
