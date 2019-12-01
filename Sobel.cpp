@@ -254,7 +254,7 @@ int *** calculateCircleHough(Mat& magnitude, Mat& direction, int radiusMax) {
 tuple<Mat, Mat, int**> combineHoughSpaces(int ***hough,  Mat intersectionHough, int rows, int cols, int radiusMax) {
     Mat circleHough = Mat(rows, cols, CV_32FC1, Scalar(0));
     int **maxVotesRadius = malloc2dArray(rows, cols);
-    int size = 2;
+    int size = 1;
 
     for(int x = 1; x < rows-1; x++) {	
         for(int y = 1; y < cols-1; y++) {
