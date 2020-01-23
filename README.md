@@ -1,22 +1,20 @@
 # Building a Dartboard Dectector
 
-Created using C++ with [OpenCV](http://opencv.org/).
+## About
 Image detection for dartboards. Build by using techniques such as Viola-Jones and Circle, Intercention Hough spaces.
-More information can be found in report.pdf
+More information can be found in report.pdf. *Created using C++ with [OpenCV](http://opencv.org/).* Here's an example where the detection is in green and ground truth in red.
 
-![Ouput image](output/dart2.jpg "Dart board detection in green, ground truth in red")
+ <p align="center"> 
+    <img src="output/dart2.jpg" alt="Dart board detection in green, ground truth in red">
+ </p>
 
-To compile Makefile
+## How to run
 
-To run the program on an image:
+To compile use *Makefile*
+`makefile`
+
+Run the program on an image. This will output a new image *detected.jpg*:
 `./a.out <imageName>`
-
-e.g
-`./a.out dart0`
-
-This will output in detected.jpg
 
 To run for all images:
 `make runall`
-
-Outputs will be found in the *output* directory.
