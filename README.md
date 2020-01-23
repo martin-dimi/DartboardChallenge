@@ -1,8 +1,7 @@
 # Building a Dartboard Dectector
 
 ## About
-Image detection for dartboards. Build by using techniques such as Viola-Jones and Circle, Intercention Hough spaces.
-More information can be found in report.pdf. *Created using C++ with [OpenCV](http://opencv.org/).* Here's an example where the detection is in green and ground truth in red.
+Image detection for dartboards. More information can be found in **report.pdf**. Build by using techniques such as Viola-Jones and Circle, Intercention Hough spaces. *Created using C++ with [OpenCV](http://opencv.org/).* Here's an example where the detection is in green and ground truth in red.
 
  <p align="center"> 
     <img src="output/dart2.jpg" alt="Dart board detection in green, ground truth in red">
